@@ -15,7 +15,7 @@ spec:
           tag: latest
 
         env:
-          HOMEPAGE_VAR_AUTH_ENABLED: "false"
+          HOMEPAGE_ALLOWED_HOSTS: "homepage.k8s.local,homepage.shahidmustafa.ie,192.168.1.150,localhost"
 
         ingress:
           main:
