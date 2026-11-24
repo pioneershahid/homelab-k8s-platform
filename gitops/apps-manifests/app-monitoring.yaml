@@ -54,3 +54,4 @@ spec:
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
       - ClientSideApplyMigration=false
+      - ServerSideDiff=false
