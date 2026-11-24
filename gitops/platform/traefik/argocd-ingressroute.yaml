@@ -7,8 +7,8 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - kind: Rule
-      match: Host(`argocd.k8s.local`)
+    - match: Host(`argocd.k8s.local`)
+      kind: Rule
       services:
         - name: argocd-server
           port: 80
