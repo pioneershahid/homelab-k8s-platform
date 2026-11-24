@@ -10,3 +10,11 @@ spec:
   resources:
     requests:
       storage: 2Ti
+
+### Install Rancher Local Path Provisioner
+#kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
+# Verify the StorageClass
+#kubectl get storageclass
+# Expected StorageClasses include:
+# local-path
+# smb
