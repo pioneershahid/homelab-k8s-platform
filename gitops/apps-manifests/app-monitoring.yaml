@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://prometheus-community.github.io/helm-charts'
+    chart: kube-prometheus-stack
+    targetRevision: 93.9.0
+    helm:
+      values: |
+        grafana:
+          adminPassword: "prom-operator"
+          persistence:
+            enabled: true
+            type: pvc
+            storageClassName: smb
+            size: 10Gi
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: smb
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 50Gi
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,26 @@
+# Environment variables and secrets
+.env
+.env.local
+*.env
+
+# SSH Keys and local secrets
+id_rsa
+id_rsa.pub
+*.pem
+*.key
+*.crt
+
+# Kubeconfig
+admin.conf
+kubeconfig
+*.kubeconfig
+
+# Temporary logs and cloud-init snippets
+*.log
+/tmp/
+/scratch/
+.system_generated/
+
+# OS metadata
+.DS_Store
+Thumbs.db

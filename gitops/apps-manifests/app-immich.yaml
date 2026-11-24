@@ -1,0 +1,40 @@
+# Immich on Kubernetes - Deployment reference
+# Immich requires: Redis, Postgres with pgvector, Immich Server, and Immich Machine Learning.
+# The official Immich community Helm chart is the recommended deployment method.
+# Repo: https://immich-app.github.io/immich-charts
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: immich
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://immich-app.github.io/immich-charts'
+    chart: immich
+    targetRevision: 0.8.4
+    helm:
+      values: |
+        image:
+          tag: release
+        env:
+          DB_HOSTNAME: immich-database
+          DB_USERNAME: immich
+          DB_DATABASE_NAME: immich
+        immich:
+          persistence:
+            library:
+              enabled: true
+              existingClaim: pvc-shared-storage
+              subPath: "photos/library"
+              mountPath: /usr/src/app/upload
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: homelab
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-shared-storage
+spec:
+  capacity:
+    storage: 2Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-shared
+  hostPath:
+    path: /mnt/shared
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-cctv-storage
+spec:
+  capacity:
+    storage: 4Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-cctv
+  hostPath:
+    path: /mnt/cctv

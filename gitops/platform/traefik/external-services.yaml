@@ -1,0 +1,166 @@
+# External Non-Kubernetes Services on your Home LAN
+# Maps Proxmox, Pi-hole, Gitea, Home Assistant to Traefik IngressRoutes
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-proxmox
+  namespace: homelab
+spec:
+  ports:
+    - port: 8006
+      name: https
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ext-proxmox
+  namespace: homelab
+subsets:
+  - addresses:
+      - ip: 192.168.1.35
+    ports:
+      - port: 8006
+        name: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ext-proxmox-route
+  namespace: homelab
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`proxmox.shahidmustafa.ie`)
+      kind: Rule
+      services:
+        - name: ext-proxmox
+          port: 8006
+          scheme: https
+      middlewares:
+        - name: authelia
+        - name: default-headers
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-pihole
+  namespace: homelab
+spec:
+  ports:
+    - port: 80
+      name: http
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ext-pihole
+  namespace: homelab
+subsets:
+  - addresses:
+      - ip: 192.168.1.19
+    ports:
+      - port: 80
+        name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ext-pihole-route
+  namespace: homelab
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`pihole.shahidmustafa.ie`)
+      kind: Rule
+      services:
+        - name: ext-pihole
+          port: 80
+      middlewares:
+        - name: authelia
+        - name: default-headers
+        - name: addprefix-pihole
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-gitea
+  namespace: homelab
+spec:
+  ports:
+    - port: 3000
+      name: http
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ext-gitea
+  namespace: homelab
+subsets:
+  - addresses:
+      - ip: 192.168.1.26
+    ports:
+      - port: 3000
+        name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ext-gitea-route
+  namespace: homelab
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`gitea.shahidmustafa.ie`)
+      kind: Rule
+      services:
+        - name: ext-gitea
+          port: 3000
+      middlewares:
+        - name: authelia
+        - name: default-headers
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-homeassistant
+  namespace: homelab
+spec:
+  ports:
+    - port: 8123
+      name: http
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ext-homeassistant
+  namespace: homelab
+subsets:
+  - addresses:
+      - ip: 192.168.1.2
+    ports:
+      - port: 8123
+        name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ext-homeassistant-route
+  namespace: homelab
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`hassio.shahidmustafa.ie`)
+      kind: Rule
+      services:
+        - name: ext-homeassistant
+          port: 8123
+      middlewares:
+        - name: default-headers

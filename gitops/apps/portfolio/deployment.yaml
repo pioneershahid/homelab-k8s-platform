@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shahid-portfolio
+  namespace: homelab
+  labels:
+    app: portfolio
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: portfolio
+  template:
+    metadata:
+      labels:
+        app: portfolio
+    spec:
+      imagePullSecrets:
+      - name: dockerhub-secret
+      containers:
+      - name: web
+        image: pioneershahid/portfolio:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shahid-portfolio
+  namespace: homelab
+spec:
+  selector:
+    app: portfolio
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: shahid-portfolio-route
+  namespace: homelab
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`shahidmustafa.ie`) || Host(`www.shahidmustafa.ie`) || Host(`portfolio.k8s.local`)
+      kind: Rule
+      services:
+        - name: shahid-portfolio
+          port: 80
+      middlewares:
+        - name: default-headers

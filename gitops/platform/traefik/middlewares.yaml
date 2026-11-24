@@ -1,0 +1,63 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: default-headers
+  namespace: homelab
+spec:
+  headers:
+    frameDeny: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 15552000
+    customFrameOptionsValue: SAMEORIGIN
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirectscheme
+  namespace: homelab
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: addprefix-pihole
+  namespace: homelab
+spec:
+  addPrefix:
+    prefix: /admin
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: authelia
+  namespace: homelab
+spec:
+  forwardAuth:
+    address: http://authelia.homelab.svc.cluster.local:9091/api/authz/forward-auth?rd=https://auth.shahidmustafa.ie
+    trustForwardHeader: true
+    authResponseHeaders:
+      - Remote-User
+      - Remote-Groups
+      - Remote-Name
+      - Remote-Email
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: default-whitelist
+  namespace: homelab
+spec:
+  ipAllowList:
+    sourceRange:
+      - 10.0.0.0/8
+      - 192.168.1.0/24
+      - 172.16.0.0/12

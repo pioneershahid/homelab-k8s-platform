@@ -1,0 +1,71 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: default-headers
+  namespace: dev
+spec:
+  headers:
+    frameDeny: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 15552000
+    customFrameOptionsValue: SAMEORIGIN
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: default-headers
+  namespace: prod
+spec:
+  headers:
+    frameDeny: true
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 15552000
+    customFrameOptionsValue: SAMEORIGIN
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: frontend-route
+  namespace: dev
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`dev.k8s.local`)
+      kind: Rule
+      services:
+        - name: frontend
+          port: 80
+      middlewares:
+        - name: default-headers
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: frontend-route
+  namespace: prod
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`prod.k8s.local`)
+      kind: Rule
+      services:
+        - name: frontend
+          port: 80
+      middlewares:
+        - name: default-headers

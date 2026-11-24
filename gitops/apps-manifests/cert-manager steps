@@ -1,0 +1,354 @@
+1. The exact error
+Your Argo CD output says:
+failed to discover server resources
+for group version cert-manager.io/v1:
+
+the server could not find the requested resource
+
+
+It also identifies the missing resources:
+cert-manager.io/Certificate
+cert-manager.io/Issuer
+
+
+The Wazuh chart is trying to create these certificate resources:
+Resource	Purpose
+wazuh-root-ca	Root certificate
+wazuh-admin	Indexer administration certificate
+wazuh-node	Indexer node certificate
+wazuh-dashboard	Dashboard certificate
+wazuh-filebeat	Filebeat certificate
+wazuh-ca-issuer	Certificate authority issuer
+wazuh-selfsigned-issuer	Self-signed certificate issuer
+
+Kubernetes does not recognize these resource types because the cert-manager Custom Resource Definitions (CRDs) are missing.
+
+This also explains why:
+- The wazuh namespace exists.
+- No Wazuh pods exist.
+- No PVCs exist.
+- No Wazuh events exist.
+Argo CD failed before it could create the workloads.
+2. Install cert-manager first
+I recommend installing it as a separate platform component, managed independently from Wazuh.
+
+The official cert-manager installation documentation supports Kubernetes manifests, Helm and GitOps deployment. 
+cert-manager Documentation+2
+
+
+For a quick installation, use the official release manifest.
+
+Run:
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.21.3/cert-manager.yaml
+
+
+This installs:
+- cert-manager CRDs
+- cert-manager controller
+- cert-manager webhook
+- cert-manager CA injector
+Do not install cert-manager inside the Wazuh Helm chart. It is a cluster-wide dependency and should be installed exactly once. 
+cert-manager Documentation
+
+3. Wait for cert-manager to become ready
+Run:
+kubectl get pods -n cert-manager -w
+
+
+You should eventually see three components running:
+cert-manager
+Expected 1/1
+
+cert-manager-cainjector
+Expected 1/1
+
+cert-manager-webhook
+Expected 1/1
+
+
+You can also wait for them programmatically:
+kubectl wait \
+  --for=condition=Available \
+  deployment/cert-manager \
+  deployment/cert-manager-cainjector \
+  deployment/cert-manager-webhook \
+  -n cert-manager \
+  --timeout=180s
+
+
+Verify the CRDs:
+kubectl get crd | grep cert-manager
+
+
+You should see resources including:
+certificates.cert-manager.io
+issuers.cert-manager.io
+clusterissuers.cert-manager.io
+
+
+4. Let Argo CD retry Wazuh
+Once cert-manager is ready, refresh the Wazuh Application:
+kubectl annotate application wazuh -n argocd \
+  argocd.argoproj.io/refresh=hard --overwrite
+
+
+If you have the Argo CD CLI, you can explicitly synchronize:
+argocd app sync wazuh
+
+
+Then check:
+kubectl get certificates,issuers -n wazuh
+
+
+And:
+kubectl get pods -n wazuh -w
+
+
+5. What the deployment should look like
+Deployment dependency sequence
+1. cert-manager
+   
+   Installs CRDs and certificate controllers
+   Prerequisite identified
+2. Wazuh certificates
+   
+   Root CA, admin, node, dashboard and Filebeat certificates
+3. Wazuh Indexer
+   
+   StatefulSet and persistent storage
+4. Wazuh Manager
+   
+   Master and agent management
+5. Wazuh Dashboard
+   
+   Web interface, eventually exposed through Traefik
+
+One important detail: installing cert-manager does not guarantee every certificate will be issued immediately. We'll need to inspect certificate status and events if the next stage fails.
+
+6. My recommendation for your GitOps architecture
+After getting Wazuh deployed, I recommend adding a dedicated app-cert-manager.yaml to your platform applications and managing cert-manager through Argo CD.
+
+Set the deployment order so cert-manager is installed before Wazuh. This avoids the same dependency problem on future cluster rebuilds.
+
+For now, do just step 2 and step 3. Send me:
+kubectl get pods -n cert-manager
+kubectl get crd | grep cert-manager
+
+
+Then we'll get Wazuh past its certificate dependency and onto actual pod startup.
+
+
+home page repo changed from repoURL: 'https://jameswgrant.github.io/helm-charts''' to  https://jameswynn.github.io/helm-charts
+changes made in project
+ubuntu@kubeadm-ha-master-1:~/gitops$ nc -vz 192.168.1.29 445
+Connection to 192.168.1.29 445 port [tcp/microsoft-ds] succeeded!
+
+sudo apt-get update
+sudo apt-get install -y cifs-utils
+
+4. Install the SMB CSI driver through Argo CD
+Since you manage your cluster with GitOps, let's keep the driver under Argo CD too.
+
+Create:
+nano apps-manifests/app-smb-csi.yaml
+
+
+Use this manifest:
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: smb-csi-driver
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-csi.github.io/csi-driver-smb
+    chart: csi-driver-smb
+    targetRevision: 1.20.4
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+
+
+Version 1.20.4 is listed in the driver's chart repository. 
+GitHub+1
+
+
+Once API connectivity is stable:
+kubectl apply -f apps-manifests/app-smb-csi.yaml
+
+
+Then check:
+kubectl get pods -n kube-system | grep smb
+
+
+You should see the SMB controller and node plugin pods.
+5. Configure the SMB credentials
+Don't paste your SMB password into this chat.
+
+Once the driver is installed, create a Kubernetes Secret. The following commands prompt for your credentials without putting the password directly into your shell command history:
+read -rp "SMB username: " SMB_USER
+read -rsp "SMB password: " SMB_PASS
+echo
+
+kubectl create secret generic smbcreds \
+  --namespace kube-system \
+  --from-literal=username="$SMB_USER" \
+  --from-literal=password="$SMB_PASS" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+unset SMB_USER SMB_PASS
+
+
+6. Create the SMB StorageClass
+After the driver is running and the Secret exists, create:
+nano apps-manifests/storageclass-smb.yaml
+
+
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: smb
+provisioner: smb.csi.k8s.io
+parameters:
+  source: "//192.168.1.29/shared"
+  csi.storage.k8s.io/provisioner-secret-name: smbcreds
+  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+  csi.storage.k8s.io/node-stage-secret-name: smbcreds
+  csi.storage.k8s.io/node-stage-secret-namespace: kube-system
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+mountOptions:
+  - dir_mode=0770
+  - file_mode=0660
+  - noperm
+  - noserverino
+
+
+
+Apply it:
+kubectl apply -f apps-manifests/storageclass-smb.yaml
+kubectl get storageclass
+
+
+The CSI driver's documented StorageClass parameters support this configuration. 
+GitHub+1
+
+. Create a test PVC and pod
+Run this on master-1:
+kubectl create namespace storage-test
+
+cat <<'EOF' | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smb-test
+  namespace: storage-test
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: smb
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: smb-test
+  namespace: storage-test
+spec:
+  containers:
+    - name: test
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - "echo SMB-storage-working > /data/test.txt && sleep 3600"
+      volumeMounts:
+        - name: smb-volume
+          mountPath: /data
+  volumes:
+    - name: smb-volume
+      persistentVolumeClaim:
+        claimName: smb-test
+EOF
+
+
+Check the result:
+kubectl get pvc,pod -n storage-test
+
+
+If the PVC becomes Bound and the pod becomes Running, verify that the file can be written and read:
+kubectl exec -n storage-test smb-test -- cat /data/test.txt
+
+
+Expected output:
+SMB-storage-working
+
+
+### CPU issue
+Your master node reports Common KVM processor and lacks the x86-64-v2 instruction flags.
+Open the Proxmox web interface.
+
+Select your Kubernetes VM.
+Open Hardware → Processors → Edit.
+Change Type from kvm64 (or the current generic type) to host.
+
+
+## issue with pvc
+**Issue we were trying to solve**
+
+The Wazuh deployment managed by Argo CD was failing because its Indexer and Manager StatefulSets were creating PersistentVolumeClaims without the required SMB StorageClass (`smb`). As a result, both PVCs remained in `Pending` state because Kubernetes could not provision persistent storage.
+
+Although the Wazuh Application manifest contained `storageClass: smb`, an earlier Argo CD sync operation was still using outdated Helm values. This caused the generated StatefulSets to retain an empty `storageClassName`.
+
+**Root cause and resolution**
+
+We removed the old Wazuh Argo CD Application and its Kubernetes namespace, then recreated the application using the existing GitHub Helm chart and corrected GitOps manifest. We also changed all five Proxmox VMs to CPU type `host` to expose the CPU instructions required by the Wazuh Dashboard image.
+
+**Result**
+
+The new installation successfully created both PVCs using the `smb` StorageClass:
+
+- Indexer: 20Gi — `Bound`
+- Manager: 50Gi — `Bound`
+
+Argo CD now reports `Synced / Progressing`, indicating that deployment is underway.
+
+**Lesson learned**
+
+When Helm values appear correct but generated Kubernetes resources do not reflect them, inspect the actual rendered manifests and Argo CD sync operation source. If an operation is stale, terminate it and refresh before retrying. When necessary, a clean application recreation can resolve lingering state and configuration inconsistencies.
+
+
+## Arogcd
+argocd-ingressroute.yaml
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`argocd.k8s.local`)
+      kind: Rule
+      services:
+        - name: argocd-server
+          port: 80
+    - match: Host(`argocd.k8s.local`)
+      kind: Rule
+      services:
+        - name: argocd-server
+          port: 443
+          scheme: https
+  tls: {}          
