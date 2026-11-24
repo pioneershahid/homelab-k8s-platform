@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: portfolio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/pioneershahid/homelab-k8s-platform.git'
+    targetRevision: HEAD
+    path: gitops/apps/portfolio
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: homelab
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

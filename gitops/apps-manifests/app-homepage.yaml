@@ -14,6 +14,9 @@ spec:
         image:
           tag: latest
 
+        env:
+          HOMEPAGE_VAR_AUTH_ENABLED: "false"
+
         ingress:
           main:
             enabled: true

@@ -13,6 +13,7 @@ spec:
       services:
         - name: argocd-server
           port: 80
+          scheme: h2c
     - match: Host(`argocd.k8s.local`)
       kind: Rule
       services:
