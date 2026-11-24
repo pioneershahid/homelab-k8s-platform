@@ -10,6 +10,7 @@ spec:
     chart: kube-prometheus-stack
     targetRevision: 93.9.0
     helm:
+      skipCrds: false
       values: |
         grafana:
           adminPassword: "prom-operator"
@@ -38,3 +39,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
