@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-config
+  namespace: homelab
+data:
+  configuration.yml: |
+    theme: auto
+    identity_validation:
+      reset_password:
+        jwt_secret: insecure_jwt_secret_change_me_later
+    server:
+      address: tcp://0.0.0.0:9091/
+    log:
+      level: info
+    telemetry:
+      metrics:
+        enabled: false
+    totp:
+      issuer: shahidmustafa.ie
+    authentication_backend:
+      file:
+        path: /config/users_database.yml
+    access_control:
+      default_policy: one_factor
+    session:
+      name: authelia_session
+      secret: insecure_session_secret_change_me_later
+      cookies:
+        - domain: shahidmustafa.ie
+          authelia_url: https://auth.shahidmustafa.ie
+          default_redirection_url: https://shahidmustafa.ie
+      expiration: 3600
+      inactivity: 300
+    regulation:
+      max_retries: 3
+      find_time: 120
+      ban_time: 300
+    storage:
+      encryption_key: insecure_storage_encryption_key_change_me
+      local:
+        path: /tmp/db.sqlite3
+    notifier:
+      filesystem:
+        filename: /tmp/notification.txt
+  users_database.yml: |
+    users:
+      admin:
+        disabled: false
+        displayname: "Admin"
+        password: "$argon2id$v=19$m=65536,t=3,p=4$sj6e7Z0oR6x1xN0Z9O1Q1A$6K6FmFvB9N7c3Q6n5R4w7E1d2C3b4A5z6Y7x8W9v0U"
+        email: admin@shahidmustafa.ie
+        groups:
+          - admins
+          - dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authelia
+  namespace: homelab
+  labels:
+    app: authelia
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authelia
+  template:
+    metadata:
+      labels:
+        app: authelia
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: authelia
+        image: authelia/authelia:latest
+        ports:
+        - containerPort: 9091
+          name: http
+        volumeMounts:
+        - name: config-dir
+          mountPath: /config
+      volumes:
+      - name: config-dir
+        configMap:
+          name: authelia-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authelia
+  namespace: homelab
+spec:
+  selector:
+    app: authelia
+  ports:
+  - port: 9091
+    targetPort: 9091
+    name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: authelia-route
+  namespace: homelab
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`auth.shahidmustafa.ie`) || Host(`auth.k8s.local`)
+      kind: Rule
+      services:
+        - name: authelia
+          port: 9091
+      middlewares:
+        - name: default-headers

@@ -1,101 +1,22 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: frigate-config
-  namespace: homelab
-data:
-  config.yml: |
-    mqtt:
-      enabled: false
-
-    cameras: {}
----
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
 metadata:
   name: frigate
-  namespace: homelab
-  labels:
-    app: frigate
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: frigate
-  template:
-    metadata:
-      labels:
-        app: frigate
-    spec:
-      containers:
-      - name: frigate
-        image: ghcr.io/blakeblackshear/frigate:stable
-        env:
-        - name: FRIGATE_RTSP_PASSWORD
-          value: "password"
-        securityContext:
-          privileged: true
-        ports:
-        - containerPort: 5000
-          name: http
-        - containerPort: 8554
-          name: rtsp
-        volumeMounts:
-        - name: dshm
-          mountPath: /dev/shm
-        - name: cctv-storage
-          mountPath: /media/frigate
-        - name: config-volume
-          mountPath: /config
-        - name: config-file
-          mountPath: /config/config.yml
-          subPath: config.yml
-      volumes:
-      - name: dshm
-        emptyDir:
-          medium: Memory
-          sizeLimit: 1Gi
-      - name: cctv-storage
-        hostPath:
-          path: /mnt/cctv
-      - name: config-volume
-        emptyDir: {}
-      - name: config-file
-        configMap:
-          name: frigate-config
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: frigate
-  namespace: homelab
-spec:
-  selector:
-    app: frigate
-  ports:
-  - port: 5000
-    targetPort: 5000
-    name: http
-  - port: 8554
-    targetPort: 8554
-    name: rtsp
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: frigate-route
-  namespace: homelab
-spec:
-  entryPoints:
-    - web
-    - websecure
-  routes:
-    - match: Host(`frigate.shahidmustafa.ie`) || Host(`frigate.k8s.local`)
-      kind: Rule
-      services:
-        - name: frigate
-          port: 5000
-      middlewares:
-        - name: default-headers
+  project: default
+  source:
+    repoURL: 'https://github.com/pioneershahid/homelab-k8s-platform.git'
+    targetRevision: HEAD
+    path: gitops/apps/frigate
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: homelab
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

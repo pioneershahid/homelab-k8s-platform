@@ -53,6 +53,10 @@ if [ -f "$ENV_FILE" ]; then
   fi
 fi
 
+echo "✨ Creating base namespaces (homelab, traefik)..."
+kubectl create namespace homelab --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace traefik --dry-run=client -o yaml | kubectl apply -f -
+
 # Applies storage prerequisites (persistent-volumes.yaml and storageclass-smb.yaml).
 echo "✨ Applying Storage Prerequisites & StorageClasses..."
 GITOPS_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -63,23 +67,9 @@ if [ -f "$GITOPS_ROOT/platform/storage/storageclass-smb.yaml" ]; then
   kubectl apply -f "$GITOPS_ROOT/platform/storage/storageclass-smb.yaml" || true
 fi
 
-#Applies Traefik IngressRoutes, Middlewares, and the CKAD lab.
-echo "✨ Applying Traefik Routes & Middlewares..."
-if [ -d "$GITOPS_ROOT/platform/traefik" ]; then
-  kubectl apply -f "$GITOPS_ROOT/platform/traefik/" || true
-fi
-
-echo "✨ Applying CKAD Dev/Prod Lab..."
-if [ -d "$GITOPS_ROOT/apps/ckad-lab" ]; then
-  kubectl apply -f "$GITOPS_ROOT/apps/ckad-lab/" || true
-fi
-
-# Applies the Root Application (root-application.yaml), which triggers ArgoCD to continuously sync all applications:
-# Wave -2: cert-manager
-# Wave -1: smb-csi-driver
-# Wave 0: traefik, monitoring, homepage
-# Wave 1: ckad-lab (dev/prod), traefik-routes, frigate, immich, wazuh
-# Wave 2: portfolio
+# Pre-install Traefik CRDs if needed so ArgoCD can discover IngressRoute/Middleware types immediately
+echo "✨ Pre-installing Traefik CRDs..."
+kubectl apply --server-side -f https://raw.githubusercontent.com/traefik/traefik/v3.3/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml || true
 
 echo "✨ Applying Root Application (App-of-Apps)..."
 if [ -f "$(dirname "$0")/root-application.yaml" ]; then
