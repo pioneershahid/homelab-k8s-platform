@@ -37,14 +37,7 @@ spec:
     server: 'https://kubernetes.default.svc'
     namespace: monitoring
 
-  ignoreDifferences:
-    - group: ""
-      kind: PersistentVolumeClaim
-      name: kube-prometheus-stack-grafana
-      namespace: monitoring
-      jsonPointers:
-        - /spec/volumeName
-        
+       
   syncPolicy:
     automated:
       prune: true
@@ -52,6 +45,3 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - RespectIgnoreDifferences=true
-      - ClientSideApplyMigration=false
-      - ServerSideDiff=false
