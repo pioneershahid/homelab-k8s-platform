@@ -20,6 +20,9 @@ spec:
             storageClassName: smb
             size: 10Gi
         prometheus:
+          serviceAccount:
+            create: true
+            createTokenSecret: true
           prometheusSpec:
             retention: 15d
             storageSpec:
