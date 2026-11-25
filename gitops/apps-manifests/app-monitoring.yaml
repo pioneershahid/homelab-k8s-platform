@@ -28,7 +28,7 @@ spec:
             storageSpec:
               volumeClaimTemplate:
                 spec:
-                  storageClassName: local-storage
+                  storageClassName: local-path
                   accessModes: ["ReadWriteOnce"]
                   resources:
                     requests:
