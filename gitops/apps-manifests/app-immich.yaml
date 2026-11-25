@@ -26,6 +26,11 @@ spec:
           DB_DATABASE_NAME: immich
         redis:
           enabled: true
+          master:
+            persistence:
+              enabled: true
+              storageClass: local-path
+              size: 1Gi
         immich:
           persistence:
             library:
